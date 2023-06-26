@@ -16,8 +16,8 @@ services:
       - "4001:80"
     environment:
       - PORT=80
-      - STORAGE_ACCOUNT_NAME=dktstorage
-      - STORAGE_ACCESS_KEY=zsLHOq96NLGjpCMIsYDg60RtuGNAbRHgccYwQAPvS24AhZOkWE3VyIExt78Ah8VsQp6J3HknMNeD+ASt5IjnbA==
+      - STORAGE_ACCOUNT_NAME=
+      - STORAGE_ACCESS_KEY=
     restart: "no"
   video-streaming:
     image: video-streaming
@@ -58,3 +58,13 @@ services:
     depends_on:
       - db
     restart: "no"
+  rabbit:
+    image: rabbitmq:3.8.1-management
+    container_name: rabbit
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    expose:
+      - "5672"
+      - "15672"
+    restart: always
