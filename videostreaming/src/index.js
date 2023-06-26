@@ -2,8 +2,7 @@ const express = require("express");
 const http = require("http");
 const mongodb= require("mongodb")
 const PORT = process.env.PORT ;
-
-const app = express();
+const amqp = require('amqplib')
 if (!process.env.PORT) {
     throw new Error("Please specify the port number for the HTTP server with the environment variable PORT.");
 }
@@ -23,36 +22,35 @@ if (!process.env.DBHOST) {
 if (!process.env.DBNAME) {
     throw new Error("Please specify the name of the database using environment variable DBNAME");
 }
+
+if (!process.env.RABBIT) {
+    throw new Error("Please specify the name of the RabbitMQ host using environment variable RABBIT");
+}
+
 const VIDEO_STORAGE_PORT = parseInt(process.env.VIDEO_STORAGE_PORT);
 const VIDEO_STORAGE_HOST = process.env.VIDEO_STORAGE_HOST;
 const DBHOST = process.env.DBHOST;
 const DBNAME = process.env.DBNAME;
+const RABBIT = process.env.RABBIT
 
-function sendViewedMessage(videoPath){
-    const postOptions = {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-    };
-    const requestBody = {
+function connecRabbit(){
+    console.log(`Connecting to RabbitMQ server at ${RABBIT} .`);
+    return amqp.connect(RABBIT)
+        .then(connection => {
+            console.log("Connected to RabbitMQ.");
+
+            return connection.createChannel()
+        })
+}
+function sendViewedMessage(messageChannel, videoPath){
+    console.log(`Publishing message on "viewed" queue.`);
+    const msg = {
         videoPath: videoPath
     };
-    const req = http.request(
-        "http://history/viewed",
-        postOptions
-    );
-    req.on("close",() => {
-        
-    });
-    req.on("err",() => {
-        console.log(err && err.stack || err)
-        
-    });
-    req.write(JSON.stringify(requestBody));
-    req.end()
+    const jsonMsg = JSON.stringify(msg);
+    messageChannel.publish("", "viewed", Buffer.from(jsonMsg))
 }
-function main(){
+function setupHandlers(app, messageChannel){
     return mongodb.MongoClient.connect(DBHOST)
         .then(client => {
             const db = client.db(DBNAME);
@@ -83,7 +81,7 @@ function main(){
                         
                         );
                         req.pipe(forwardRequest);
-                        sendViewedMessage(videoRecord.videoPath)
+                        sendViewedMessage(messageChannel, videoRecord.videoPath)
                         // console.log('message send')
                     })
                     .catch(err => {
@@ -92,10 +90,24 @@ function main(){
                         res.sendStatus(500);
                     });
             });
-        app.listen(PORT, () => {
-            console.log(`Microservice listening on port ${PORT}, point your browser at http://localhost:3000/video`);
-        });
+
     });
+}
+function startHttpServer(messageChannel){
+    return new Promise(resolve => {
+        const app = express();
+        setupHandlers(app, messageChannel);
+        const port = process.env.PORT && parseInt(process.env.PORT) || 3000;
+        app.listen(port, () => {
+            resolve();
+        });
+    })
+}
+function main(){
+    return connecRabbit()
+        .then(messageChannel => {
+            return startHttpServer(messageChannel);
+        })
 }
 main()
     .then(() => console.log("Microservice online"))

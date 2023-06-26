@@ -16,8 +16,8 @@ services:
       - "4001:80"
     environment:
       - PORT=80
-      - STORAGE_ACCOUNT_NAME=dktstorage
-      - STORAGE_ACCESS_KEY=zsLHOq96NLGjpCMIsYDg60RtuGNAbRHgccYwQAPvS24AhZOkWE3VyIExt78Ah8VsQp6J3HknMNeD+ASt5IjnbA==
+      - STORAGE_ACCOUNT_NAME=
+      - STORAGE_ACCESS_KEY=
     restart: "no"
   video-streaming:
     image: video-streaming
@@ -36,6 +36,7 @@ services:
       - DBNAME=video-streaming
       - VIDEO_STORAGE_HOST=video-storage
       - VIDEO_STORAGE_PORT=80
+      - RABBIT=amqp://guest:guest@rabbit:5672
     depends_on:
       - db
     restart: "no"
@@ -55,8 +56,10 @@ services:
       - NODE_ENV=development
       - DBHOST=mongodb://db:27017
       - DBNAME=history
+      - RABBIT=amqp://guest:guest@rabbit:5672
     depends_on:
       - db
+      - rabbit
     restart: "no"
   rabbit:
     image: rabbitmq:3.8.1-management
